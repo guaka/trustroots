@@ -4,6 +4,7 @@ var should = require('should'),
     request = require('supertest'),
     path = require('path'),
     mongoose = require('mongoose'),
+    moment = require('moment'),
     User = mongoose.model('User'),
     config = require(path.resolve('./config/config')),
     express = require(path.resolve('./config/lib/express'));
@@ -27,7 +28,7 @@ describe('User profile CRUD tests', function () {
 
   before(function (done) {
     // Get application
-    app = express.init(mongoose);
+    app = express.init(mongoose.connection);
     agent = request.agent(app);
 
     done();
@@ -181,6 +182,7 @@ describe('User profile CRUD tests', function () {
                 return done(userInfoErr);
               }
 
+              // Second time changing it
               userInfoRes.body.should.be.instanceof(Object);
               userInfoRes.body.firstName.should.be.equal('user_update_first');
               userInfoRes.body.lastName.should.be.equal('user_update_last');
@@ -318,252 +320,473 @@ describe('User profile CRUD tests', function () {
     });
   });
 
-  it('should not be able to update profile picture without being logged-in', function (done) {
+  describe('Profile picture tests', function () {
 
-    agent.post('/api/users-avatar')
-      .send({})
-      .expect(403)
-      .end(function (userInfoErr, userInfoRes) {
-        if (userInfoErr) {
-          return done(userInfoErr);
-        }
+    it('should not be able to update profile picture without being logged-in', function (done) {
 
-        userInfoRes.body.message.should.equal('Forbidden.');
+      agent.post('/api/users-avatar')
+        .send({})
+        .expect(403)
+        .end(function (userInfoErr, userInfoRes) {
+          if (userInfoErr) {
+            return done(userInfoErr);
+          }
 
-        // Call the assertion callback
-        return done();
-      });
+          userInfoRes.body.message.should.equal('Forbidden.');
+
+          // Call the assertion callback
+          return done();
+        });
+    });
+
+    it('should be able to change profile picture to a jpg file when logged-in', function (done) {
+      agent.post('/api/auth/signin')
+        .send(credentials)
+        .expect(200)
+        .end(function (signinErr) {
+          // Handle signin error
+          if (signinErr) {
+            return done(signinErr);
+          }
+
+          agent.post('/api/users-avatar')
+            .attach('avatar', './modules/users/tests/server/img/avatar.jpg')
+            .expect(200)
+            .end(function (userInfoErr, userInfoRes) {
+              // Handle change profile picture error
+              if (userInfoErr) {
+                return done(userInfoErr);
+              }
+
+              userInfoRes.body.message.should.equal('Avatar image uploaded.');
+
+              return done();
+            });
+        });
+    });
+
+    it('should be able to change profile picture to a gif file when logged-in', function (done) {
+      agent.post('/api/auth/signin')
+        .send(credentials)
+        .expect(200)
+        .end(function (signinErr) {
+          // Handle signin error
+          if (signinErr) {
+            return done(signinErr);
+          }
+
+          agent.post('/api/users-avatar')
+            .attach('avatar', './modules/users/tests/server/img/avatar.gif')
+            .expect(200)
+            .end(function (userInfoErr, userInfoRes) {
+              // Handle change profile picture error
+              if (userInfoErr) {
+                return done(userInfoErr);
+              }
+
+              userInfoRes.body.message.should.equal('Avatar image uploaded.');
+
+              return done();
+            });
+        });
+    });
+
+    it('should be able to change profile picture to a png file when logged-in', function (done) {
+      agent.post('/api/auth/signin')
+        .send(credentials)
+        .expect(200)
+        .end(function (signinErr) {
+          // Handle signin error
+          if (signinErr) {
+            return done(signinErr);
+          }
+
+          agent.post('/api/users-avatar')
+            .attach('avatar', './modules/users/tests/server/img/avatar.png')
+            .expect(200)
+            .end(function (userInfoErr, userInfoRes) {
+              // Handle change profile picture error
+              if (userInfoErr) {
+                return done(userInfoErr);
+              }
+
+              userInfoRes.body.message.should.equal('Avatar image uploaded.');
+
+              return done();
+            });
+        });
+    });
+
+    it('should not be able to change profile picture if attach a picture with a different field name', function (done) {
+      agent.post('/api/auth/signin')
+        .send(credentials)
+        .expect(200)
+        .end(function (signinErr) {
+          // Handle signin error
+          if (signinErr) {
+            return done(signinErr);
+          }
+
+          agent.post('/api/users-avatar')
+            .attach('fieldThatDoesntWork', './modules/users/tests/server/img/avatar.jpg')
+            .expect(400)
+            .end(function (userInfoErr, userInfoRes) {
+              userInfoRes.body.message.should.equal('Missing `avatar` field from the API call.');
+              done(userInfoErr);
+            });
+        });
+    });
+
+    it('should not be able to change profile picture to a pdf file', function (done) {
+      agent.post('/api/auth/signin')
+        .send(credentials)
+        .expect(200)
+        .end(function (signinErr) {
+          // Handle signin error
+          if (signinErr) {
+            return done(signinErr);
+          }
+
+          agent.post('/api/users-avatar')
+            .attach('avatar', './modules/users/tests/server/img/test.pdf')
+            .expect(415)
+            .end(function (userInfoErr, userInfoRes) {
+
+              // Handle change profile picture error
+              if (userInfoErr) {
+                return done(userInfoErr);
+              }
+
+              userInfoRes.body.message.should.equal('Unsupported Media Type.');
+
+              return done();
+            });
+        });
+    });
+
+    it('should not be able to change profile picture to a pdf file disguised as jpg file', function (done) {
+      agent.post('/api/auth/signin')
+        .send(credentials)
+        .expect(200)
+        .end(function (signinErr) {
+          // Handle signin error
+          if (signinErr) {
+            return done(signinErr);
+          }
+
+          agent.post('/api/users-avatar')
+            .attach('avatar', './modules/users/tests/server/img/test-actually-pdf-looks-like-jpg.jpg')
+            .expect(415)
+            .end(function (userInfoErr, userInfoRes) {
+
+              // Handle change profile picture error
+              if (userInfoErr) {
+                return done(userInfoErr);
+              }
+
+              userInfoRes.body.message.should.equal('Unsupported Media Type.');
+
+              return done();
+            });
+        });
+    });
+
+    it('should not be able to change profile picture to a svg file', function (done) {
+      agent.post('/api/auth/signin')
+        .send(credentials)
+        .expect(200)
+        .end(function (signinErr) {
+          // Handle signin error
+          if (signinErr) {
+            return done(signinErr);
+          }
+
+          agent.post('/api/users-avatar')
+            .attach('avatar', './modules/users/tests/server/img/test.svg')
+            .expect(415)
+            .end(function (userInfoErr, userInfoRes) {
+
+              // Handle change profile picture error
+              if (userInfoErr) {
+                return done(userInfoErr);
+              }
+
+              userInfoRes.body.message.should.equal('Unsupported Media Type.');
+
+              return done();
+            });
+        });
+    });
+
+    it('should not be able to change profile picture to a text file with jpg extension', function (done) {
+      agent.post('/api/auth/signin')
+        .send(credentials)
+        .expect(200)
+        .end(function (signinErr) {
+          // Handle signin error
+          if (signinErr) {
+            return done(signinErr);
+          }
+
+          agent.post('/api/users-avatar')
+            .attach('avatar', './modules/users/tests/server/img/this-is-text-file.jpg')
+            .expect(415) // 415: Unsupported Media Type.
+            .end(function (userInfoErr, userInfoRes) {
+
+              // Handle change profile picture error
+              if (userInfoErr) {
+                return done(userInfoErr);
+              }
+
+              userInfoRes.body.message.should.equal('Unsupported Media Type.');
+
+              return done();
+            });
+        });
+    });
+
+    it('should not be able to change profile picture to a too big file', function (done) {
+      agent.post('/api/auth/signin')
+        .send(credentials)
+        .expect(200)
+        .end(function (signinErr) {
+          // Handle signin error
+          if (signinErr) {
+            return done(signinErr);
+          }
+
+          agent.post('/api/users-avatar')
+            .attach('avatar', './modules/users/tests/server/img/too-big-file.png')
+            .expect(413)
+            .end(function (userInfoErr, userInfoRes) {
+
+              // Handle change profile picture error
+              if (userInfoErr) {
+                return done(userInfoErr);
+              }
+
+              userInfoRes.body.message.should.equal('Image too big. Please maximum ' + (config.maxUploadSize / (1024 * 1024)).toFixed(2) + ' Mb files.');
+
+              return done();
+            });
+        });
+    });
   });
 
-  it('should be able to change profile picture to a jpg file when logged-in', function (done) {
-    agent.post('/api/auth/signin')
-      .send(credentials)
-      .expect(200)
-      .end(function (signinErr) {
-        // Handle signin error
-        if (signinErr) {
-          return done(signinErr);
-        }
+  describe('Username change', function () {
+    it('should not let a new user to change username', function (done) {
+      agent.post('/api/auth/signin')
+        .send(credentials)
+        .expect(200)
+        .end(function (err) {
+          if (err) {
+            return done(err);
+          }
+          var user2 = _user;
+          user2.username = _user.username + '01';
+          delete user2.email;
+          agent.put('/api/users')
+            .send(user2)
+            .expect(403)
+            .end(function (err, res) {
+              if (err) {
+                return done(err);
+              }
+              res.body.message.should.equal('You cannot change your username at this time.');
+              return done();
+            });
+        });
+    });
 
-        agent.post('/api/users-avatar')
-          .attach('avatar', './modules/users/tests/server/img/avatar.jpg')
+    it('should allow changing username for users created 3 months ago who never changed their username', function (done) {
+      var threeMonthsAgo = moment(user.created)
+        .subtract(3, 'months')
+        .toDate();
+      user.update({ $set: { created: threeMonthsAgo } }, function (err) {
+        should.not.exist(err);
+        agent.post('/api/auth/signin')
+          .send(credentials)
           .expect(200)
-          .end(function (userInfoErr, userInfoRes) {
-            // Handle change profile picture error
-            if (userInfoErr) {
-              return done(userInfoErr);
+          .end(function (err) {
+            if (err) {
+              return done(err);
             }
-
-            userInfoRes.body.message.should.equal('Avatar image uploaded.');
-
-            return done();
+            var user2 = _user;
+            user2.username = _user.username + '01';
+            delete user2.email;
+            agent.put('/api/users')
+              .send(user2)
+              .expect(200)
+              .end(function (err, res) {
+                if (err) {
+                  return done(err);
+                }
+                res.body.username.should.equal(user2.username);
+                return done();
+              });
           });
       });
-  });
+    });
 
-  it('should be able to change profile picture to a gif file when logged-in', function (done) {
-    agent.post('/api/auth/signin')
-      .send(credentials)
-      .expect(200)
-      .end(function (signinErr) {
-        // Handle signin error
-        if (signinErr) {
-          return done(signinErr);
-        }
+    it('should not be able to change username if username was changed within previous 3 months',
+      function (done) {
+        var threeMonthsAgo = moment(user.created)
+          .subtract(3, 'months')
+          .toDate();
+        user.update({ $set: { created: threeMonthsAgo } }, function (err) {
+          should.not.exist(err);
+          agent.post('/api/auth/signin')
+            .send(credentials)
+            .expect(200)
+            .end(function (err) {
+              if (err) {
+                return done(err);
+              }
+              var user2 = _user;
+              user2.username = _user.username + '01';
+              delete user2.email;
+              // First username change
+              // First we're setting usernameUpdate
+              // This should succeed
+              agent.put('/api/users')
+                .send(user2)
+                .expect(200)
+                .end(function (err, res) {
+                  if (err) {
+                    return done(err);
+                  }
+                  res.body.username.should.equal(user2.username);
+                  user2.username = _user.username + '02';
+                  // Second username change for the same user
+                  // Then we're testing that previous usernameUpdate prevents further changes
+                  // This should fail
+                  agent.put('/api/users')
+                    .send(user2)
+                    .end(function (err, res) {
+                      if (err) {
+                        return done(err);
+                      }
+                      res.body.message.should.equal('You cannot change your username at this time.');
+                      return done();
+                    });
+                });
+            });
+        });
+      });
 
-        agent.post('/api/users-avatar')
-          .attach('avatar', './modules/users/tests/server/img/avatar.gif')
+    it('should be able to change username if username was changed more than 3 months ago',
+      function (done) {
+        var threeMonthsAgo = moment(user.created)
+          .subtract(3, 'months')
+          .toDate();
+        user.update({ $set: { created: threeMonthsAgo } }, function (err) {
+          should.not.exist(err);
+          agent.post('/api/auth/signin')
+            .send(credentials)
+            .expect(200)
+            .end(function (err) {
+              if (err) {
+                return done(err);
+              }
+              // First change
+              var user2 = _user;
+              user2.username = _user.username + '01';
+              delete user2.email;
+              agent.put('/api/users')
+                .send(user2)
+                .expect(200)
+                .end(function (err, res) {
+                  if (err) {
+                    return done(err);
+                  }
+                  res.body.username.should.equal(user2.username);
+                  User.findById(user._id, function (err, user) {
+                    if (err) {
+                      return done(err);
+                    }
+                    var threeMonthsAgo = moment(user.usernameUpdated)
+                      .subtract(3, 'months')
+                      .toDate();
+                    user.update(
+                      { $set: { usernameUpdated: threeMonthsAgo } },
+                      function (err) {
+                        if (err) {
+                          return done(err);
+                        }
+                        // Second time changing it
+                        user2.username = _user.username + '02';
+                        agent.put('/api/users')
+                          .send(user2)
+                          .end(function (err, res) {
+                            if (err) {
+                              return done(err);
+                            }
+                            res.body.username.should.equal(user2.username);
+                            return done();
+                          });
+                      });
+                  });
+                });
+            });
+        });
+      });
+
+    it('should not be allowed to change the usernameUpdateAllowed status',
+      function (done) {
+        agent.post('/api/auth/signin')
+          .send(credentials)
           .expect(200)
-          .end(function (userInfoErr, userInfoRes) {
-            // Handle change profile picture error
-            if (userInfoErr) {
-              return done(userInfoErr);
+          .end(function (err) {
+            if (err) {
+              return done(err);
             }
+            agent.put('/api/users')
+              .send({
+                usernameUpdateAllowed: true
+              })
+              .expect(200)
+              .end(function (err, res) {
+                if (err) {
+                  return done(err);
+                }
 
-            userInfoRes.body.message.should.equal('Avatar image uploaded.');
+                res.body.usernameUpdateAllowed.should.equal(false);
 
-            return done();
+                User.findOne(
+                  { username: credentials.username },
+                  function (err, newUser) {
+                    should.not.exist(newUser.usernameUpdateAllowed);
+                    done(err);
+                  });
+              });
           });
       });
-  });
 
-  it('should be able to change profile picture to a png file when logged-in', function (done) {
-    agent.post('/api/auth/signin')
-      .send(credentials)
-      .expect(200)
-      .end(function (signinErr) {
-        // Handle signin error
-        if (signinErr) {
-          return done(signinErr);
-        }
-
-        agent.post('/api/users-avatar')
-          .attach('avatar', './modules/users/tests/server/img/avatar.png')
+    it('should not be allowed to change the date when their username was last changed',
+      function (done) {
+        agent.post('/api/auth/signin')
+          .send(credentials)
           .expect(200)
-          .end(function (userInfoErr, userInfoRes) {
-            // Handle change profile picture error
-            if (userInfoErr) {
-              return done(userInfoErr);
+          .end(function (err) {
+            if (err) {
+              return done(err);
             }
-
-            userInfoRes.body.message.should.equal('Avatar image uploaded.');
-
-            return done();
-          });
-      });
-  });
-
-  it('should not be able to change profile picture if attach a picture with a different field name', function (done) {
-    agent.post('/api/auth/signin')
-      .send(credentials)
-      .expect(200)
-      .end(function (signinErr) {
-        // Handle signin error
-        if (signinErr) {
-          return done(signinErr);
-        }
-
-        agent.post('/api/users-avatar')
-          .attach('fieldThatDoesntWork', './modules/users/tests/server/img/avatar.jpg')
-          .expect(400)
-          .end(function (userInfoErr, userInfoRes) {
-            userInfoRes.body.message.should.equal('Missing `avatar` field from the API call.');
-            done(userInfoErr);
-          });
-      });
-  });
-
-  it('should not be able to change profile picture to a pdf file', function (done) {
-    agent.post('/api/auth/signin')
-      .send(credentials)
-      .expect(200)
-      .end(function (signinErr) {
-        // Handle signin error
-        if (signinErr) {
-          return done(signinErr);
-        }
-
-        agent.post('/api/users-avatar')
-          .attach('avatar', './modules/users/tests/server/img/test.pdf')
-          .expect(415)
-          .end(function (userInfoErr, userInfoRes) {
-
-            // Handle change profile picture error
-            if (userInfoErr) {
-              return done(userInfoErr);
-            }
-
-            userInfoRes.body.message.should.equal('Unsupported Media Type.');
-
-            return done();
-          });
-      });
-  });
-
-  it('should not be able to change profile picture to a pdf file disguised as jpg file', function (done) {
-    agent.post('/api/auth/signin')
-      .send(credentials)
-      .expect(200)
-      .end(function (signinErr) {
-        // Handle signin error
-        if (signinErr) {
-          return done(signinErr);
-        }
-
-        agent.post('/api/users-avatar')
-          .attach('avatar', './modules/users/tests/server/img/test-actually-pdf-looks-like-jpg.jpg')
-          .expect(415)
-          .end(function (userInfoErr, userInfoRes) {
-
-            // Handle change profile picture error
-            if (userInfoErr) {
-              return done(userInfoErr);
-            }
-
-            userInfoRes.body.message.should.equal('Unsupported Media Type.');
-
-            return done();
-          });
-      });
-  });
-
-  it('should not be able to change profile picture to a svg file', function (done) {
-    agent.post('/api/auth/signin')
-      .send(credentials)
-      .expect(200)
-      .end(function (signinErr) {
-        // Handle signin error
-        if (signinErr) {
-          return done(signinErr);
-        }
-
-        agent.post('/api/users-avatar')
-          .attach('avatar', './modules/users/tests/server/img/test.svg')
-          .expect(415)
-          .end(function (userInfoErr, userInfoRes) {
-
-            // Handle change profile picture error
-            if (userInfoErr) {
-              return done(userInfoErr);
-            }
-
-            userInfoRes.body.message.should.equal('Unsupported Media Type.');
-
-            return done();
-          });
-      });
-  });
-
-  it('should not be able to change profile picture to a text file with jpg extension', function (done) {
-    agent.post('/api/auth/signin')
-      .send(credentials)
-      .expect(200)
-      .end(function (signinErr) {
-        // Handle signin error
-        if (signinErr) {
-          return done(signinErr);
-        }
-
-        agent.post('/api/users-avatar')
-          .attach('avatar', './modules/users/tests/server/img/this-is-text-file.jpg')
-          .expect(415) // 415: Unsupported Media Type.
-          .end(function (userInfoErr, userInfoRes) {
-
-            // Handle change profile picture error
-            if (userInfoErr) {
-              return done(userInfoErr);
-            }
-
-            userInfoRes.body.message.should.equal('Unsupported Media Type.');
-
-            return done();
-          });
-      });
-  });
-
-  it('should not be able to change profile picture to a too big file', function (done) {
-    agent.post('/api/auth/signin')
-      .send(credentials)
-      .expect(200)
-      .end(function (signinErr) {
-        // Handle signin error
-        if (signinErr) {
-          return done(signinErr);
-        }
-
-        agent.post('/api/users-avatar')
-          .attach('avatar', './modules/users/tests/server/img/too-big-file.png')
-          .expect(413)
-          .end(function (userInfoErr, userInfoRes) {
-
-            // Handle change profile picture error
-            if (userInfoErr) {
-              return done(userInfoErr);
-            }
-
-            userInfoRes.body.message.should.equal('Image too big. Please maximum ' + (config.maxUploadSize / (1024 * 1024)).toFixed(2) + ' Mb files.');
-
-            return done();
+            agent.put('/api/users')
+              .send({
+                usernameUpdated: moment().subtract(3, 'months').toDate()
+              })
+              .expect(200)
+              .end(function (err) {
+                if (err) {
+                  return done(err);
+                }
+                User.findOne(
+                  { username: credentials.username },
+                  function (err, newUser) {
+                    should.not.exist(newUser.usernameUpdated);
+                    done(err);
+                  });
+              });
           });
       });
   });

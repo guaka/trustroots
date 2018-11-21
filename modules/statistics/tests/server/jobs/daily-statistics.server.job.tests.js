@@ -12,24 +12,16 @@ var should = require('should'),
     statsJob = require(path.resolve('./modules/statistics/server/jobs/daily-statistics.server.job'));
 
 describe('Daily Statistics Job - Unit Test', function () {
-  // replace the influx & stathat service stat() functions with fake version
-  var sandbox;
-
-  // initializing and clearing the sinon sandbox
-  beforeEach(function () {
-    // sandboxing in sinon helps restore the spied/stubbed/mocked functions
-    sandbox = sinon.sandbox.create();
-  });
 
   afterEach(function () {
     // restore the stubbed services
-    sandbox.restore();
+    sinon.restore();
   });
 
   // stub the influx and stathat endpoints
   beforeEach(function () {
     // stub the influx endpoint(s)
-    sandbox.stub(influx.InfluxDB.prototype, 'writeMeasurement');
+    sinon.stub(influx.InfluxDB.prototype, 'writeMeasurement');
 
     // and writeMeasurement returns a Promise
     influx.InfluxDB.prototype.writeMeasurement.returns(
@@ -39,7 +31,7 @@ describe('Daily Statistics Job - Unit Test', function () {
     );
 
     // provide config options for influxdb
-    sandbox.stub(config.influxdb, 'options').value({
+    sinon.stub(config.influxdb, 'options').value({
       host: 'localhost',
       port: 8086,
       protocol: 'http',
@@ -47,20 +39,17 @@ describe('Daily Statistics Job - Unit Test', function () {
     });
 
     // stub the stathat endpoints
-    sandbox.stub(stathat, 'trackEZValue');
+    sinon.stub(stathat, 'trackEZValue');
     stathat.trackEZValue.callsArgAsync(3);
   });
 
   context('influxdb configured', function () {
     beforeEach(function () {
-      // stub the config.stathat.key
-      // sandbox.stub(config.stathat, 'key', 'stathatkey');
-
       // stub enable stathat in config
-      sandbox.stub(config.stathat, 'enabled').value(false);
+      sinon.stub(config.stathat, 'enabled').value(false);
 
       // stub enable influx in config
-      sandbox.stub(config.influxdb, 'enabled').value(true);
+      sinon.stub(config.influxdb, 'enabled').value(true);
     });
 
     it('should reach the influxdb with data in correct format', function (done) {
@@ -71,7 +60,7 @@ describe('Daily Statistics Job - Unit Test', function () {
           // test influx endpoint
 
           // Called total 2 times, once per each stat call in job
-          sinon.assert.callCount(influx.InfluxDB.prototype.writeMeasurement, 12);
+          sinon.assert.callCount(influx.InfluxDB.prototype.writeMeasurement, 17);
 
           // Member count stat point
           var memberMeasurement = influx.InfluxDB.prototype.writeMeasurement.getCall(0).args[0];
@@ -104,13 +93,13 @@ describe('Daily Statistics Job - Unit Test', function () {
   context('stathat configured', function () {
     beforeEach(function () {
       // stub the config.stathat.key
-      sandbox.stub(config.stathat, 'key').value('stathatkey');
+      sinon.stub(config.stathat, 'key').value('stathatkey');
 
       // stub enable stathat in config
-      sandbox.stub(config.stathat, 'enabled').value(true);
+      sinon.stub(config.stathat, 'enabled').value(true);
 
       // stub enable influx in config
-      sandbox.stub(config.influxdb, 'enabled').value(false);
+      sinon.stub(config.influxdb, 'enabled').value(false);
     });
 
     it('should reach stathat with data in correct format', function (done) {
@@ -121,7 +110,7 @@ describe('Daily Statistics Job - Unit Test', function () {
           // test stathat endpoint
 
           // Called total 4 times, twice per each stat call in job
-          sinon.assert.callCount(stathat.trackEZValue, 27);
+          sinon.assert.callCount(stathat.trackEZValue, 37);
 
           // `getCall(0)` and `getCall(1)` contain calls for member count
           var memberGroupedArgs = _.zip.apply(this, [

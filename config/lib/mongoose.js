@@ -43,12 +43,10 @@ module.exports.connect = function (callback) {
     }
   };
 
-  var db;
-
   async.waterfall([
     // Connect
     function (done) {
-      db = mongoose.connect(config.db.uri, mongoConnectionOptions, function (err) {
+      mongoose.connect(config.db.uri, mongoConnectionOptions, function (err) {
         if (err) {
           console.error(chalk.red('Could not connect to MongoDB!'));
           console.error(err);
@@ -84,7 +82,7 @@ module.exports.connect = function (callback) {
   ],
   function () {
     if (callback) {
-      callback(db);
+      callback(mongoose.connection);
     }
   });
 };
@@ -92,6 +90,27 @@ module.exports.connect = function (callback) {
 module.exports.disconnect = function (callback) {
   mongoose.disconnect(function (err) {
     console.info(chalk.yellow('Disconnected from MongoDB.'));
-    callback(err);
+    if (callback) {
+      callback(err);
+    }
+  });
+};
+
+module.exports.dropDatabase = function (connection, callback) {
+  if (process.env.NODE_ENV === 'production') {
+    console.error('You cannot drop database in production mode!');
+    return process.exit(1);
+  }
+
+  connection.dropDatabase(function (err) {
+    if (err) {
+      console.error('Failed to drop database', err);
+    } else {
+      console.log('Successfully dropped database:', connection.db.databaseName);
+    }
+
+    if (callback) {
+      callback(err);
+    }
   });
 };

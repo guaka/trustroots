@@ -3,13 +3,13 @@
 /**
  * Module dependencies.
  */
-var path = require('path'),
+var _ = require('lodash'),
+    path = require('path'),
     async = require('async'),
     juice = require('juice'),
     moment = require('moment'),
     autolinker = require('autolinker'),
     analyticsHandler = require(path.resolve('./modules/core/server/controllers/analytics.server.controller')),
-    inviteCodeService = require(path.resolve('./modules/users/server/services/invite-codes.server.service')),
     textService = require(path.resolve('./modules/core/server/services/text.server.service')),
     render = require(path.resolve('./config/lib/render')),
     agenda = require(path.resolve('./config/lib/agenda')),
@@ -222,12 +222,22 @@ exports.sendSignupEmailConfirmation = function (user, callback) {
 
 exports.sendSupportRequest = function (replyTo, supportRequest, callback) {
 
+  var subject = 'Support request';
+
+  // I miss CoffeeSscript
+  if (_.has(supportRequest, 'username') && supportRequest.username) {
+    subject += ' from ' + supportRequest.username;
+  }
+  if (_.has(supportRequest, 'displayName') && supportRequest.displayName) {
+    subject += ' (' + supportRequest.displayName + ')';
+  }
+
   var params = {
     from: 'Trustroots Support <' + config.supportEmail + '>',
     name: 'Trustroots Support', // `To:`
     email: config.supportEmail, // `To:`
     replyTo: replyTo,
-    subject: 'Support request',
+    subject: subject,
     request: supportRequest,
     skipHtmlTemplate: true, // Don't render html template for this email
     sparkpostCampaign: 'support-request'
@@ -300,8 +310,8 @@ exports.sendReactivateHosts = function (user, callback) {
  * 1/3 welcome sequence email
  */
 exports.sendWelcomeSequenceFirst = function (user, callback) {
-  var urlInvite = url + '/invite',
-      urlEditProfile = url + '/profile/edit',
+  var urlEditProfile = url + '/profile/edit',
+      urlFAQ = url + '/faq',
       campaign = 'welcome-sequence-first',
       utmParams = {
         source: 'transactional-email',
@@ -310,19 +320,16 @@ exports.sendWelcomeSequenceFirst = function (user, callback) {
       };
 
   var params = exports.addEmailBaseTemplateParams({
-    subject: 'Welcome to Trustroots ' + user.firstName + '!',
+    subject: '👋 Welcome to Trustroots ' + user.firstName + '!',
     from: {
-      // First welcome sequence email has more personal feeling to it:
       name: 'Natalia',
-      // ...and uses our support email instead of "no-reply@":
+      // Use support email instead of default "no-reply@":
       address: config.supportEmail
     },
     firstName: user.firstName,
     name: user.displayName,
     email: user.email,
-    urlInvitePlainText: urlInvite,
-    urlInvite: analyticsHandler.appendUTMParams(urlInvite, utmParams),
-    urlEditProfilePlainText: urlEditProfile,
+    urlFAQ: analyticsHandler.appendUTMParams(urlFAQ, utmParams),
     urlEditProfile: analyticsHandler.appendUTMParams(urlEditProfile, utmParams),
     utmCampaign: campaign,
     sparkpostCampaign: campaign
@@ -335,10 +342,7 @@ exports.sendWelcomeSequenceFirst = function (user, callback) {
  * 2/3 welcome sequence email
  */
 exports.sendWelcomeSequenceSecond = function (user, callback) {
-  var inviteCode = inviteCodeService.getCode(),
-      signupLabel = config.domain + '/c/' + inviteCode,
-      urlSignup = url + '/c/' + inviteCode,
-      urlInvite = url + '/invite',
+  var urlMeet = url + '/offer/meet',
       campaign = 'welcome-sequence-second',
       utmParams = {
         source: 'transactional-email',
@@ -347,15 +351,16 @@ exports.sendWelcomeSequenceSecond = function (user, callback) {
       };
 
   var params = exports.addEmailBaseTemplateParams({
-    subject: 'Invite your friends to Trustroots',
+    subject: 'Meet new people at Trustroots, ' + user.firstName,
+    from: {
+      name: 'Kasper',
+      // Use support email instead of default "no-reply@":
+      address: config.supportEmail
+    },
     firstName: user.firstName,
     name: user.displayName,
     email: user.email,
-    signupLabel: signupLabel,
-    urlInvitePlainText: urlInvite,
-    urlInvite: analyticsHandler.appendUTMParams(urlInvite, utmParams),
-    urlSignupPlainText: urlSignup,
-    urlSignup: analyticsHandler.appendUTMParams(urlSignup, utmParams),
+    urlMeetup: analyticsHandler.appendUTMParams(urlMeet, utmParams),
     utmCampaign: campaign,
     sparkpostCampaign: campaign
   });
@@ -368,15 +373,11 @@ exports.sendWelcomeSequenceSecond = function (user, callback) {
  */
 exports.sendWelcomeSequenceThird = function (user, callback) {
 
-  // Default topic for emails
-  var messageTopic = 'feedback';
-
   // For members with empty profiles,
   // remind them how important it is to fill their profile.
-  var descriptionLength = textService.plainText(user.description, true).length;
-  if (descriptionLength < config.profileMinimumLength) {
-    messageTopic = 'fill-profile';
-  }
+  // Ask for feedback from the rest.
+  var descriptionLength = textService.plainText(user.description || '', true).length;
+  var messageTopic = (descriptionLength < config.profileMinimumLength) ? 'fill-profile' : 'feedback';
 
   var urlEditProfile = url + '/profile/edit',
       campaign = 'welcome-sequence-third' + '-' + messageTopic,
@@ -389,15 +390,13 @@ exports.sendWelcomeSequenceThird = function (user, callback) {
   var params = exports.addEmailBaseTemplateParams({
     subject: 'How is it going, ' + user.firstName + '?',
     from: {
-      // Third welcome sequence email has more personal feeling to it:
-      name: 'Mikael',
-      // ...and uses our support email instead of "no-reply@":
+      name: 'Dario',
+      // Use support email instead of default "no-reply@":
       address: config.supportEmail
     },
     firstName: user.firstName,
     name: user.displayName,
     email: user.email,
-    urlEditProfilePlainText: urlEditProfile,
     urlEditProfile: analyticsHandler.appendUTMParams(urlEditProfile, utmParams),
     utmCampaign: campaign,
     sparkpostCampaign: campaign,
@@ -405,6 +404,35 @@ exports.sendWelcomeSequenceThird = function (user, callback) {
   });
 
   exports.renderEmailAndSend('welcome-sequence-third', params, callback);
+};
+
+/**
+ * Reference Notification (First between users)
+ */
+exports.sendReferenceNotificationFirst = function (userFrom, userTo, callback) {
+
+  var params = exports.addEmailBaseTemplateParams({
+    subject: 'New reference from ' + userFrom.username,
+    email: userTo.email,
+    giveReferenceUrl: url + '/profile/' + userFrom.username + '/references/new'
+  });
+
+  exports.renderEmailAndSend('reference-notification-first', params, callback);
+};
+
+/**
+ * Reference Notification (Second reference between users)
+ */
+exports.sendReferenceNotificationSecond = function (userFrom, userTo, reference, callback) {
+
+  var params = exports.addEmailBaseTemplateParams({
+    subject: 'New reference from ' + userFrom.username,
+    email: userTo.email,
+    seeReferencesUrl: url + '/profile/' + userTo.username + '/references',
+    recommend: reference.recommend
+  });
+
+  exports.renderEmailAndSend('reference-notification-second', params, callback);
 };
 
 /**

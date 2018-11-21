@@ -143,7 +143,7 @@ var UserSchema = new Schema({
   },
   gender: {
     type: String,
-    enum: ['', 'male', 'female', 'other'],
+    enum: ['', 'female', 'male', 'non-binary', 'other'],
     default: ''
   },
   languages: {
@@ -169,6 +169,9 @@ var UserSchema = new Schema({
     validate: [validateUsername, 'Please fill in valid username: 3+ characters long, non banned word, characters "_-.", no consecutive dots, does not begin or end with dots, letters a-z and numbers 0-9.'],
     lowercase: true, // Stops users creating case sensitive duplicate usernames with "username" and "USERname", via @link https://github.com/meanjs/mean/issues/147
     trim: true
+  },
+  usernameUpdated: {
+    type: Date
   },
   // Stores unaltered original username
   displayUsername: {
@@ -222,7 +225,7 @@ var UserSchema = new Schema({
     }],
     default: ['user']
   },
-  /* The last time the user was logged in (uncertain if its live right now 5 Apr 2015) */
+  /* The last time the user was logged in; collected from July 2017 onwards */
   seen: {
     type: Date
   },
@@ -327,7 +330,7 @@ UserSchema.pre('save', function (next) {
  */
 UserSchema.methods.hashPassword = function (password) {
   if (this.salt && password) {
-    return crypto.pbkdf2Sync(password, new Buffer(this.salt, 'base64'), 10000, 64, 'SHA1').toString('base64');
+    return crypto.pbkdf2Sync(password, Buffer.from(this.salt, 'base64'), 10000, 64, 'SHA1').toString('base64');
   } else {
     return password;
   }

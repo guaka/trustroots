@@ -78,6 +78,7 @@
                     <option ng-selected="profileEditAbout.user.gender === ''" value="">I'd rather not tell</option>
                     <option ng-selected="profileEditAbout.user.gender === 'female'" value="female">Female</option>
                     <option ng-selected="profileEditAbout.user.gender === 'male'" value="male">Male</option>
+                    <option ng-selected="profileEditAbout.user.gender === 'non-binary'" value="non-binary">Non-binary</option>
                     <option ng-selected="profileEditAbout.user.gender === 'other'" value="other">Other</option>
                   </select>
                 </div>
@@ -127,16 +128,6 @@
                        ng-change="profileEdit.unsavedModifications = true"
                        aria-labelledby="label-languages"></div>
                   <p class="help-block">Add languages you speak.</p>
-                </div>
-              </div>
-
-              <div class="form-group">
-                <label for="username" class="col-sm-3 text-right control-label">Username</label>
-                <div class="col-sm-9">
-                  <p class="form-control-static text-muted" ng-bind-html="::profileEditAbout.profileURL | trustedHtml"></p>
-                  <p class="help-block">
-                    <small><a ui-sref="support">Contact us</a> if you would like to change your username.</small>
-                  </p>
                 </div>
               </div>
 

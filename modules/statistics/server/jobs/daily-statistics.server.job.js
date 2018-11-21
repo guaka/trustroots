@@ -65,6 +65,31 @@ module.exports = function (job, agendaDone) {
       });
     },
 
+    // Ammount of users - The past 7 days
+    function (done) {
+      collectLastSeen('past7d', done);
+    },
+
+    // Ammount of users - The past 14 days
+    function (done) {
+      collectLastSeen('past14d', done);
+    },
+
+    // Ammount of users - The past 30 days
+    function (done) {
+      collectLastSeen('past30d', done);
+    },
+
+    // Ammount of users - The past 6 months
+    function (done) {
+      collectLastSeen('past6m', done);
+    },
+
+    // Ammount of users - The past year
+    function (done) {
+      collectLastSeen('past12m', done);
+    },
+
     // Hosting offer count
     function (done) {
 
@@ -75,15 +100,15 @@ module.exports = function (job, agendaDone) {
         }
 
         // Write numbers to stats
-        async.eachSeries(hostOfferCounts, function (offerCount, doneStatus) {
+        async.eachOfSeries(hostOfferCounts, function (offerCount, offerStatus, doneStatus) {
           writeDailyStat({
             namespace: 'offers',
             values: {
-              count: parseInt(offerCount.count, 10)
+              count: parseInt(offerCount, 10)
             },
             tags: {
               type: 'host',
-              status: String(offerCount._id) // `yes|maybe|no`
+              status: String(offerStatus) // `yes|maybe|no`
             }
           }, doneStatus);
         }, done);
@@ -191,3 +216,24 @@ function writeDailyStat(statObject, callback) {
     callback(null);
   });
 }
+
+/**
+ * Collect Last Seen Stats
+ */
+function collectLastSeen(seenSince, callback) {
+  statistics.getLastSeenStatistic(seenSince, function (err, count) {
+    if (err) {
+      return callback(err);
+    }
+    writeDailyStat({
+      namespace: seenSince,
+      values: {
+        count: parseInt(count, 10)
+      },
+      tags: {
+        access: 'members'
+      }
+    }, callback);
+  });
+};
+

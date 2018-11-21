@@ -6,7 +6,7 @@
     .controller('SearchController', SearchController);
 
   /* @ngInject */
-  function SearchController($scope, $window, $analytics, $stateParams, $timeout, offer, tribe, Authentication, FiltersService, messageCenterService) {
+  function SearchController($scope, $window, $analytics, $stateParams, $timeout, offer, tribe, Authentication, FiltersService, messageCenterService, LocationService) {
 
     // ViewModel
     var vm = this;
@@ -24,6 +24,8 @@
     vm.onPlaceSearch = onPlaceSearch;
     vm.openSearchPlaceInput = openSearchPlaceInput;
     vm.onLanguageFiltersChange = onLanguageFiltersChange;
+    vm.onSeenFilterChange = onSeenFilterChange;
+    vm.onlineInPast6Months = vm.filters.seen && vm.filters.seen.months === 6;
     vm.sidebarTab = 'filters';
 
     // Visibility toggle for search place input on small screens
@@ -47,6 +49,16 @@
       if (tribe && tribe._id) {
         vm.filters.tribes = [tribe._id];
         FiltersService.set('tribes', [tribe._id]);
+      }
+
+      if (angular.isDefined(vm.searchQuery) && angular.isString(vm.searchQuery) && vm.searchQuery) {
+        LocationService.suggestions(vm.searchQuery).then(function (suggestions) {
+          if (suggestions.length) {
+            var bounds = LocationService.getBounds(suggestions[0]);
+            onPlaceSearch(bounds, 'bounds');
+            vm.searchQuery = suggestions[0].trTitle;
+          }
+        });
       }
 
       // Watch for changes at types filters
@@ -103,6 +115,22 @@
       $timeout(function () {
         // Save new value to cache
         FiltersService.set('languages', vm.filters.languages || []);
+
+        onFiltersUpdated();
+      });
+    }
+
+    /**
+     * Fired for changes at seen filter
+     */
+    function onSeenFilterChange() {
+      vm.filters.seen.months = vm.onlineInPast6Months ? 6 : 24;
+
+      // `vm.filters.seen` is still out of sync at this point,
+      // but in next cycle after `$timeout` we have updated version.
+      $timeout(function () {
+        // Save new value to cache
+        FiltersService.set('seen', vm.filters.seen);
 
         onFiltersUpdated();
       });
